@@ -1,0 +1,22 @@
+# API Keys and Environment Variables
+.env
+.env.*
+
+# Data & Batches
+batches/
+*.csv
+*.tsv
+*.json
+*.xlsx
+!template_data.csv
+ARCH-1504_2286_web-pages.csv
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS generated files
+.DS_Store
+Thumbs.db

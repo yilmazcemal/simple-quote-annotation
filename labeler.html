@@ -228,28 +228,117 @@
             position: relative;
         }
 
-        /* ----- Floating Action Menu ----- */
+        /* ----- Context Menu ----- */
         #floating-menu {
             position: fixed;
-            background-color: var(--accent-color);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 999px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: var(--shadow);
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
             display: none;
             z-index: 100;
-            transform: translate(-50%, -120%);
-            transition: opacity 0.2s, transform 0.2s;
-            align-items: center;
-            gap: 0.5rem;
+            min-width: 220px;
+            overflow: hidden;
         }
 
-        #floating-menu:hover {
-            background-color: var(--accent-hover);
-            transform: translate(-50%, -120%) scale(1.05);
+        .ctx-drag-handle {
+            padding: 0.3rem 1rem;
+            cursor: grab;
+            background-color: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-align: center;
+            user-select: none;
+        }
+
+        .ctx-drag-handle:active { cursor: grabbing; }
+
+        .ctx-option {
+            padding: 0.6rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-main);
+            transition: background-color 0.15s;
+            white-space: nowrap;
+        }
+
+        .ctx-option:hover {
+            background-color: var(--panel-hover);
+        }
+
+        .ctx-option:not(:last-child) {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .ctx-option.speech-direct { border-left: 3px solid var(--success-color); }
+        .ctx-option.speech-indirect { border-left: 3px solid var(--warning-color); }
+
+        /* ----- Speaker Popup ----- */
+        #speaker-popup {
+            position: fixed;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 101;
+            padding: 1rem;
+            min-width: 280px;
+            transform: translate(-50%, 0);
+        }
+
+        .btn-na {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            background-color: var(--panel-hover);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .btn-na.active {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        /* ----- Reorder & Active Block ----- */
+        .quote-block + .quote-block {
+            margin-top: 0.75rem;
+        }
+
+        .quote-block.active-block {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 1px var(--accent-color);
+        }
+
+        .btn-reorder {
+            background: none;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            padding: 0.15rem 0.4rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            border-radius: 3px;
+            line-height: 1;
+        }
+
+        .btn-reorder:hover:not(:disabled) {
+            background-color: var(--panel-hover);
+            color: var(--text-main);
+        }
+
+        .btn-reorder:disabled {
+            opacity: 0.3;
+            cursor: default;
         }
 
         /* ----- Quotes Panel Content ----- */
@@ -546,10 +635,18 @@
                 <!-- Populated by JS -->
             </div>
 
-            <!-- Floating Menu for Gemini Analysis -->
+            <!-- Context Menu -->
             <div id="floating-menu">
-                <span id="floating-menu-text">✨ Analyze Quote with Gemini</span>
-                <div class="loader" id="floating-menu-loader" style="display: none;"></div>
+                <div class="ctx-drag-handle" id="ctx-drag-handle">&#x2261; drag</div>
+                <div id="ctx-main">
+                    <div class="ctx-option" data-action="new-quote">📝 New Quote</div>
+                    <div class="ctx-option" data-action="set-speaker" id="ctx-set-speaker">👤 Set Speaker</div>
+                    <div class="ctx-option" data-action="analyze">✨ Analyze with Gemini</div>
+                </div>
+                <div id="ctx-speech-type" style="display: none;">
+                    <div class="ctx-option speech-direct" data-type="direct_quote">Direct Quote</div>
+                    <div class="ctx-option speech-indirect" data-type="indirect_speech">Indirect Speech</div>
+                </div>
             </div>
         </article>
 
@@ -632,6 +729,29 @@
         </div>
     </div>
 
+    <!-- Speaker Popup -->
+    <div id="speaker-popup">
+        <div class="ctx-drag-handle" id="popup-drag-handle" style="margin: -1rem -1rem 0.75rem -1rem; padding: 0.3rem 1rem; border-radius: var(--radius) var(--radius) 0 0;">&#x2261; drag</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Speaker set on <strong>Block <span id="popup-block-num"></span></strong>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label style="font-size: 0.75rem;">Role</label>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="text" class="form-control" id="popup-role" placeholder="Role" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem;" list="dl-speaker_role">
+                <button class="btn-na" id="popup-role-na">N/A</button>
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.75rem;">
+            <label style="font-size: 0.75rem;">Organization</label>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="text" class="form-control" id="popup-org" placeholder="Organization" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem;" list="dl-speaker_organization">
+                <button class="btn-na" id="popup-org-na">N/A</button>
+            </div>
+        </div>
+        <button class="btn btn-primary" id="popup-done" style="width: 100%; font-size: 0.8rem;">Done (Enter)</button>
+    </div>
+
     <!-- Toast Notifications Container -->
     <div id="toast-container"></div>
 
@@ -645,7 +765,8 @@
             apiKeys: ['', '', '', ''],
             currentKeyIndex: 0,
             model: 'gemini-2.0-flash',
-            translationVisible: false
+            translationVisible: false,
+            activeBlockIndex: -1
         };
 
         // Quote block template structure
@@ -653,7 +774,7 @@
             return {
                 quote_block_id: id,
                 speaker_name: '',
-                speaker_party: '',
+                speaker_organization: '',
                 speaker_role: '',
                 quote_text: '',
                 speech_type: 'direct_quote',
@@ -681,6 +802,21 @@
                     console.error("Failed to parse saved labels", e);
                 }
             }
+
+            // Migrate speaker_party → speaker_organization in existing labels
+            Object.values(state.labels).forEach(label => {
+                if (label.quote_blocks) {
+                    label.quote_blocks.forEach(block => {
+                        if ('speaker_party' in block) {
+                            block.speaker_organization = block.speaker_party;
+                            delete block.speaker_party;
+                        }
+                        if (!('speaker_organization' in block)) {
+                            block.speaker_organization = '';
+                        }
+                    });
+                }
+            });
 
             // Event Listeners
             setupEventListeners();
@@ -737,15 +873,73 @@
             // Text Selection in Article
             const articleContent = document.getElementById('article-content');
             const floatingMenu = document.getElementById('floating-menu');
-            
+            const speakerPopup = document.getElementById('speaker-popup');
+
             articleContent.addEventListener('mouseup', handleTextSelection);
             document.addEventListener('mousedown', (e) => {
-                if (e.target !== floatingMenu && !floatingMenu.contains(e.target) && e.target !== articleContent && !articleContent.contains(e.target)) {
+                if (floatingMenu.style.display !== 'none' &&
+                    !floatingMenu.contains(e.target) &&
+                    !articleContent.contains(e.target)) {
                     floatingMenu.style.display = 'none';
+                }
+                if (speakerPopup.style.display !== 'none' &&
+                    !speakerPopup.contains(e.target)) {
+                    closeSpeakerPopup();
                 }
             });
 
-            floatingMenu.addEventListener('click', analyzeWithGemini);
+            // Context menu clicks
+            floatingMenu.addEventListener('click', (e) => {
+                const option = e.target.closest('.ctx-option');
+                if (!option) return;
+                const action = option.dataset.action;
+                if (action === 'new-quote') handleNewQuoteClick();
+                else if (action === 'set-speaker') handleSetSpeakerClick();
+                else if (action === 'analyze') analyzeWithGemini();
+                const speechType = option.dataset.type;
+                if (speechType) handleSpeechTypeClick(speechType);
+            });
+
+            // Speaker popup
+            document.getElementById('popup-done').addEventListener('click', closeSpeakerPopup);
+            document.getElementById('popup-role-na').addEventListener('click', () => {
+                const input = document.getElementById('popup-role');
+                input.value = '';
+                document.getElementById('popup-role-na').classList.add('active');
+            });
+            document.getElementById('popup-org-na').addEventListener('click', () => {
+                const input = document.getElementById('popup-org');
+                input.value = '';
+                document.getElementById('popup-org-na').classList.add('active');
+            });
+            document.getElementById('popup-role').addEventListener('input', () => {
+                document.getElementById('popup-role-na').classList.remove('active');
+            });
+            document.getElementById('popup-org').addEventListener('input', () => {
+                document.getElementById('popup-org-na').classList.remove('active');
+            });
+            speakerPopup.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); closeSpeakerPopup(); }
+            });
+
+            // Draggable panels
+            let dragTarget = null, dragOffsetX = 0, dragOffsetY = 0;
+            function initDrag(handle, panel) {
+                handle.addEventListener('mousedown', (e) => {
+                    dragTarget = panel;
+                    dragOffsetX = e.clientX - panel.offsetLeft;
+                    dragOffsetY = e.clientY - panel.offsetTop;
+                    e.preventDefault();
+                });
+            }
+            initDrag(document.getElementById('ctx-drag-handle'), floatingMenu);
+            initDrag(document.getElementById('popup-drag-handle'), speakerPopup);
+            document.addEventListener('mousemove', (e) => {
+                if (!dragTarget) return;
+                dragTarget.style.left = `${e.clientX - dragOffsetX}px`;
+                dragTarget.style.top = `${e.clientY - dragOffsetY}px`;
+            });
+            document.addEventListener('mouseup', () => { dragTarget = null; });
 
             // Keyboard Shortcuts
             document.addEventListener('keydown', (e) => {
@@ -945,55 +1139,91 @@
             return state.labels[articleId];
         }
 
+        const suggestFields = ['speaker_name', 'speaker_organization', 'speaker_role', 'event_context'];
+
+        function updateSuggestions() {
+            suggestFields.forEach(field => {
+                const values = new Set();
+                Object.values(state.labels).forEach(label => {
+                    if (label.quote_blocks) {
+                        label.quote_blocks.forEach(block => {
+                            const v = (block[field] || '').trim();
+                            if (v) values.add(v);
+                        });
+                    }
+                });
+                let dl = document.getElementById(`dl-${field}`);
+                if (!dl) {
+                    dl = document.createElement('datalist');
+                    dl.id = `dl-${field}`;
+                    document.body.appendChild(dl);
+                }
+                dl.innerHTML = [...values].sort().map(v => `<option value="${escapeHtml(v)}">`).join('');
+            });
+        }
+
         function renderLabelingPanel() {
+            updateSuggestions();
             const articleId = state.articles[state.currentIndex].article_id;
             const labelData = getOrCreateLabel(articleId);
-            
-            // Setup Reasoning Textarea
+
             document.getElementById('val-reasoning').value = labelData.reasoning || '';
 
-            // Render Quote Blocks
             const container = document.getElementById('quote-blocks-container');
             container.innerHTML = '';
 
             if (labelData.quote_blocks.length === 0) {
-                container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 1rem; border: 1px dashed var(--border-color); border-radius: var(--radius);">No quote blocks yet. Highlight text to analyze, or click + Block.</div>`;
+                state.activeBlockIndex = -1;
+                container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 1rem; border: 1px dashed var(--border-color); border-radius: var(--radius);">No quote blocks yet. Highlight text to add a quote.</div>`;
                 return;
             }
 
+            if (state.activeBlockIndex < 0 || state.activeBlockIndex >= labelData.quote_blocks.length) {
+                state.activeBlockIndex = labelData.quote_blocks.length - 1;
+            }
+
             labelData.quote_blocks.forEach((block, index) => {
+                const isActive = index === state.activeBlockIndex;
+                const isFirst = index === 0;
+                const isLast = index === labelData.quote_blocks.length - 1;
+
                 const blockEl = document.createElement('div');
-                blockEl.className = 'quote-block';
+                blockEl.className = `quote-block${isActive ? ' active-block' : ''}`;
                 blockEl.innerHTML = `
-                    <div class="quote-header">
-                        <h3>Block ${block.quote_block_id}</h3>
-                        <button class="btn btn-danger btn-remove-block" data-idx="${index}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">✕ Remove</button>
+                    <div class="quote-header" data-idx="${index}" style="cursor: pointer;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <button class="btn-reorder btn-move-up" data-idx="${index}" ${isFirst ? 'disabled' : ''}>&#9650;</button>
+                                <button class="btn-reorder btn-move-down" data-idx="${index}" ${isLast ? 'disabled' : ''}>&#9660;</button>
+                            </div>
+                            <h3>Block ${block.quote_block_id}</h3>
+                        </div>
+                        <button class="btn btn-danger btn-remove-block" data-idx="${index}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">✕</button>
                     </div>
                     <div class="grid-2">
                         <div class="form-group">
                             <label>Speaker Name</label>
-                            <input type="text" class="form-control bind-input" data-idx="${index}" data-field="speaker_name" placeholder="Name" value="${escapeHtml(block.speaker_name)}">
+                            <input type="text" class="form-control bind-input" data-idx="${index}" data-field="speaker_name" placeholder="Name" value="${escapeHtml(block.speaker_name)}" list="dl-speaker_name">
                         </div>
                         <div class="form-group">
                             <label>Speech Type</label>
                             <select class="form-control bind-input" data-idx="${index}" data-field="speech_type">
                                 <option value="direct_quote" ${block.speech_type === 'direct_quote' ? 'selected' : ''}>Direct Quote</option>
                                 <option value="indirect_speech" ${block.speech_type === 'indirect_speech' ? 'selected' : ''}>Indirect Speech</option>
-                                <option value="paraphrase" ${block.speech_type === 'paraphrase' ? 'selected' : ''}>Paraphrase</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Speaker Party</label>
-                            <input type="text" class="form-control bind-input" data-idx="${index}" data-field="speaker_party" placeholder="Party or 'null'" value="${escapeHtml(block.speaker_party)}">
+                            <label>Organization</label>
+                            <input type="text" class="form-control bind-input" data-idx="${index}" data-field="speaker_organization" placeholder="Organization" value="${escapeHtml(block.speaker_organization)}" list="dl-speaker_organization">
                         </div>
                         <div class="form-group">
-                            <label>Speaker Role</label>
-                            <input type="text" class="form-control bind-input" data-idx="${index}" data-field="speaker_role" placeholder="Role or 'null'" value="${escapeHtml(block.speaker_role)}">
+                            <label>Role</label>
+                            <input type="text" class="form-control bind-input" data-idx="${index}" data-field="speaker_role" placeholder="Role" value="${escapeHtml(block.speaker_role)}" list="dl-speaker_role">
                         </div>
                     </div>
                     <div class="form-group" style="margin-top: 0.5rem;">
                         <label>Event Context</label>
-                        <input type="text" class="form-control bind-input" data-idx="${index}" data-field="event_context" placeholder="Occasion or 'null'" value="${escapeHtml(block.event_context)}">
+                        <input type="text" class="form-control bind-input" data-idx="${index}" data-field="event_context" placeholder="Context" value="${escapeHtml(block.event_context)}" list="dl-event_context">
                     </div>
                     <div class="form-group">
                         <label>Quote Text</label>
@@ -1003,37 +1233,65 @@
                 container.appendChild(blockEl);
             });
 
-            // Bind inputs for this newly rendered panel
+            // Bind inputs
             document.querySelectorAll('.bind-input').forEach(input => {
                 input.addEventListener('change', (e) => {
-                    const idx = e.target.getAttribute('data-idx');
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
                     const field = e.target.getAttribute('data-field');
                     labelData.quote_blocks[idx][field] = e.target.value;
-                    
                     if (labelData.status === 'unlabeled') {
                         labelData.status = 'labeled';
                         updateStatusBadge();
                     }
                     saveToLocalStorage();
-                    
-                    // Re-render highlights if quote text changed
                     if (field === 'quote_text') {
                         renderArticleWithHighlights(state.articles[state.currentIndex]);
                     }
                 });
             });
 
+            // Remove buttons
             document.querySelectorAll('.btn-remove-block').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    const idx = e.target.getAttribute('data-idx');
+                    e.stopPropagation();
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
                     labelData.quote_blocks.splice(idx, 1);
-                    // Re-number blocks
                     labelData.quote_blocks.forEach((b, i) => b.quote_block_id = i + 1);
+                    if (state.activeBlockIndex >= labelData.quote_blocks.length) {
+                        state.activeBlockIndex = labelData.quote_blocks.length - 1;
+                    }
                     renderLabelingPanel();
                     renderArticleWithHighlights(state.articles[state.currentIndex]);
                     saveToLocalStorage();
                 });
             });
+
+            // Reorder buttons
+            document.querySelectorAll('.btn-move-up').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    moveBlock(parseInt(e.target.getAttribute('data-idx')), -1);
+                });
+            });
+            document.querySelectorAll('.btn-move-down').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    moveBlock(parseInt(e.target.getAttribute('data-idx')), 1);
+                });
+            });
+
+            // Click header to set active block
+            document.querySelectorAll('.quote-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    if (e.target.closest('.btn-remove-block') || e.target.closest('.btn-reorder')) return;
+                    state.activeBlockIndex = parseInt(header.getAttribute('data-idx'));
+                    renderLabelingPanel();
+                });
+            });
+
+            // Scroll active block into view
+            const activeBlock = container.querySelector('.active-block');
+            if (activeBlock) activeBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function updateStatusBadge() {
@@ -1066,26 +1324,157 @@
             navigate(1);
         }
 
-        // --- Text Selection & Gemini ---
+        // --- Text Selection & Context Menu ---
         function handleTextSelection(e) {
             const selection = window.getSelection();
             const text = selection.toString().trim();
             const floatingMenu = document.getElementById('floating-menu');
-            
+
             if (text.length > 5) {
-                // Determine position using viewport coordinates (menu is position: fixed)
                 const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
 
-                floatingMenu.style.top = `${rect.top}px`;
-                floatingMenu.style.left = `${rect.left + rect.width / 2}px`;
-                floatingMenu.style.display = 'flex';
-                
-                // Store selected text for the button action
+                // Reset to main menu mode
+                document.getElementById('ctx-main').style.display = '';
+                document.getElementById('ctx-speech-type').style.display = 'none';
+
+                // Update "Set Speaker" option
+                const setSpeakerOpt = document.getElementById('ctx-set-speaker');
+                if (state.currentIndex !== -1) {
+                    const articleId = state.articles[state.currentIndex].article_id;
+                    const labelData = getOrCreateLabel(articleId);
+                    if (labelData.quote_blocks.length > 0) {
+                        const targetIdx = (state.activeBlockIndex >= 0 && state.activeBlockIndex < labelData.quote_blocks.length)
+                            ? state.activeBlockIndex
+                            : labelData.quote_blocks.length - 1;
+                        state.activeBlockIndex = targetIdx;
+                        setSpeakerOpt.style.display = '';
+                        setSpeakerOpt.textContent = `👤 Set Speaker (Block ${targetIdx + 1})`;
+                    } else {
+                        setSpeakerOpt.style.display = 'none';
+                    }
+                }
+
                 floatingMenu.dataset.selectedText = text;
+                // Center horizontally on selection, place above it
+                const menuWidth = 220;
+                const menuLeft = Math.max(8, Math.min(rect.left + rect.width / 2 - menuWidth / 2, window.innerWidth - menuWidth - 8));
+                const menuTop = Math.max(8, rect.top - 160);
+                floatingMenu.style.top = `${menuTop}px`;
+                floatingMenu.style.left = `${menuLeft}px`;
+                floatingMenu.style.display = 'block';
             } else {
                 floatingMenu.style.display = 'none';
             }
+        }
+
+        function hideContextMenu() {
+            document.getElementById('floating-menu').style.display = 'none';
+            window.getSelection().removeAllRanges();
+        }
+
+        function handleNewQuoteClick() {
+            document.getElementById('ctx-main').style.display = 'none';
+            document.getElementById('ctx-speech-type').style.display = '';
+        }
+
+        function handleSpeechTypeClick(speechType) {
+            const selectedText = document.getElementById('floating-menu').dataset.selectedText;
+            if (!selectedText || state.currentIndex === -1) return;
+
+            const articleId = state.articles[state.currentIndex].article_id;
+            const labelData = getOrCreateLabel(articleId);
+            const nextId = labelData.quote_blocks.length + 1;
+            const newBlock = createEmptyBlock(nextId);
+            newBlock.quote_text = selectedText;
+            newBlock.speech_type = speechType;
+
+            labelData.quote_blocks.push(newBlock);
+            state.activeBlockIndex = labelData.quote_blocks.length - 1;
+            if (labelData.status === 'unlabeled') labelData.status = 'labeled';
+
+            hideContextMenu();
+            renderLabelingPanel();
+            renderArticleWithHighlights(state.articles[state.currentIndex]);
+            updateStatusBadge();
+            saveToLocalStorage();
+            showToast(`Block ${nextId} created (${speechType.replace(/_/g, ' ')})`, 'success');
+        }
+
+        function handleSetSpeakerClick() {
+            const selectedText = document.getElementById('floating-menu').dataset.selectedText;
+            if (!selectedText || state.currentIndex === -1) return;
+
+            const articleId = state.articles[state.currentIndex].article_id;
+            const labelData = getOrCreateLabel(articleId);
+            if (labelData.quote_blocks.length === 0) return;
+
+            const targetIdx = state.activeBlockIndex;
+            labelData.quote_blocks[targetIdx].speaker_name = selectedText;
+
+            const menu = document.getElementById('floating-menu');
+            const menuTop = parseFloat(menu.style.top);
+            const menuLeft = parseFloat(menu.style.left);
+
+            hideContextMenu();
+            showSpeakerPopup(targetIdx, menuTop, menuLeft);
+            renderLabelingPanel();
+            saveToLocalStorage();
+        }
+
+        function showSpeakerPopup(blockIndex, top, left) {
+            const popup = document.getElementById('speaker-popup');
+            const articleId = state.articles[state.currentIndex].article_id;
+            const labelData = getOrCreateLabel(articleId);
+            const block = labelData.quote_blocks[blockIndex];
+
+            document.getElementById('popup-block-num').textContent = blockIndex + 1;
+            document.getElementById('popup-role').value = block.speaker_role || '';
+            document.getElementById('popup-org').value = block.speaker_organization || '';
+            document.getElementById('popup-role-na').classList.remove('active');
+            document.getElementById('popup-org-na').classList.remove('active');
+
+            popup.dataset.blockIndex = blockIndex;
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+            popup.style.display = 'block';
+            document.getElementById('popup-role').focus();
+        }
+
+        function closeSpeakerPopup() {
+            const popup = document.getElementById('speaker-popup');
+            if (popup.style.display === 'none') return;
+            const blockIndex = parseInt(popup.dataset.blockIndex);
+
+            const articleId = state.articles[state.currentIndex].article_id;
+            const labelData = getOrCreateLabel(articleId);
+            const block = labelData.quote_blocks[blockIndex];
+
+            block.speaker_role = document.getElementById('popup-role').value.trim();
+            block.speaker_organization = document.getElementById('popup-org').value.trim();
+
+            popup.style.display = 'none';
+            renderLabelingPanel();
+            saveToLocalStorage();
+        }
+
+        function moveBlock(index, direction) {
+            const articleId = state.articles[state.currentIndex].article_id;
+            const labelData = getOrCreateLabel(articleId);
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= labelData.quote_blocks.length) return;
+
+            const temp = labelData.quote_blocks[index];
+            labelData.quote_blocks[index] = labelData.quote_blocks[newIndex];
+            labelData.quote_blocks[newIndex] = temp;
+            labelData.quote_blocks.forEach((b, i) => b.quote_block_id = i + 1);
+
+            if (state.activeBlockIndex === index) state.activeBlockIndex = newIndex;
+            else if (state.activeBlockIndex === newIndex) state.activeBlockIndex = index;
+
+            renderLabelingPanel();
+            renderArticleWithHighlights(state.articles[state.currentIndex]);
+            saveToLocalStorage();
         }
 
         // --- Translation & Gemini API ---
@@ -1191,36 +1580,31 @@ Do not summarize, keep it 1:1 with the sentences in the text. Ensure no text is 
             const selectedText = document.getElementById('floating-menu').dataset.selectedText;
             if (!selectedText) return;
 
-            // Get next API key valid
             const apiKey = getNextApiKey();
-
             if (!apiKey) {
                 showToast('No Gemini API keys found. Please add them in Settings.', 'error');
                 openSettings();
                 return;
             }
 
-            // UI Feedback
-            const menuText = document.getElementById('floating-menu-text');
-            const menuLoader = document.getElementById('floating-menu-loader');
-            menuText.innerText = 'Analyzing...';
-            menuLoader.style.display = 'block';
+            const fullArticleText = document.getElementById('article-content').textContent;
 
-            const articleContentElement = document.getElementById('article-content');
-            const fullArticleText = articleContentElement.textContent;
+            // Hide menu immediately, show toast
+            hideContextMenu();
+            showToast('Analyzing quote with Gemini...', 'info');
 
-            const prompt = `You are a data extraction specialist doing quote attribution from Turkish political news articles.
+            const prompt = `You are a data extraction specialist doing quote attribution from news articles.
 
 Given the following selected text from the article, determine:
 1. speaker_name: Who is speaking?
-2. speaker_party: Their political party (or "null" if not explicitly stated)
+2. speaker_organization: Their organization or political party (or "null" if not explicitly stated)
 3. speaker_role: Their official title/role (or "null" if not explicitly stated)
-4. speech_type: "direct_quote", "indirect_speech", or "paraphrase"
+4. speech_type: "direct_quote" or "indirect_speech"
 5. event_context: The occasion/platform where speech was delivered (or "null")
-6. include_reasoning: 1 sentence explaining why this speaker qualifies (party affiliation or cabinet membership) or should be excluded.
+6. include_reasoning: 1 sentence explaining the attribution.
 
 Article context:
-${fullArticleText.substring(0, 8000)} // Truncating just in case it's massive
+${fullArticleText.substring(0, 8000)}
 
 Selected quote passage:
 ${selectedText}
@@ -1229,9 +1613,9 @@ Analyze ONLY the selected quote passage.
 Respond strictly in JSON format matching this schema:
 {
   "speaker_name": "string",
-  "speaker_party": "string or null",
+  "speaker_organization": "string or null",
   "speaker_role": "string or null",
-  "speech_type": "direct_quote | indirect_speech | paraphrase",
+  "speech_type": "direct_quote | indirect_speech",
   "event_context": "string or null",
   "include_reasoning": "string"
 }`;
@@ -1259,29 +1643,27 @@ Respond strictly in JSON format matching this schema:
                 try {
                     parsedResult = JSON.parse(responseText);
                 } catch(e) {
-                    // Sometime model wraps in ```json ... ```
                     const clean = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
                     parsedResult = JSON.parse(clean);
                 }
 
-                // Add data to labels
                 const articleId = state.articles[state.currentIndex].article_id;
                 const labelData = getOrCreateLabel(articleId);
-                
+
                 const nextId = labelData.quote_blocks.length + 1;
                 const newBlock = {
                     quote_block_id: nextId,
                     speaker_name: parsedResult.speaker_name === 'null' ? '' : (parsedResult.speaker_name || ''),
-                    speaker_party: parsedResult.speaker_party === 'null' ? '' : (parsedResult.speaker_party || ''),
+                    speaker_organization: (parsedResult.speaker_organization || parsedResult.speaker_party || '') === 'null' ? '' : (parsedResult.speaker_organization || parsedResult.speaker_party || ''),
                     speaker_role: parsedResult.speaker_role === 'null' ? '' : (parsedResult.speaker_role || ''),
-                    speech_type: ['direct_quote', 'indirect_speech', 'paraphrase'].includes(parsedResult.speech_type) ? parsedResult.speech_type : 'direct_quote',
+                    speech_type: ['direct_quote', 'indirect_speech'].includes(parsedResult.speech_type) ? parsedResult.speech_type : 'direct_quote',
                     event_context: parsedResult.event_context === 'null' ? '' : (parsedResult.event_context || ''),
                     quote_text: selectedText
                 };
-                
-                labelData.quote_blocks.push(newBlock);
 
-                // Append reasoning
+                labelData.quote_blocks.push(newBlock);
+                state.activeBlockIndex = labelData.quote_blocks.length - 1;
+
                 if (parsedResult.include_reasoning) {
                     const rText = document.getElementById('val-reasoning');
                     let currentReasoning = rText.value;
@@ -1291,8 +1673,6 @@ Respond strictly in JSON format matching this schema:
                 }
 
                 labelData.status = 'labeled';
-                
-                // Re-render
                 renderLabelingPanel();
                 renderArticleWithHighlights(state.articles[state.currentIndex]);
                 updateStatusBadge();
@@ -1302,12 +1682,6 @@ Respond strictly in JSON format matching this schema:
             } catch (error) {
                 console.error("Gemini Error:", error);
                 showToast(`Analysis failed: ${error.message}`, 'error');
-            } finally {
-                // Reset UI
-                menuText.innerText = '✨ Analyze Quote with Gemini';
-                menuLoader.style.display = 'none';
-                document.getElementById('floating-menu').style.display = 'none';
-                window.getSelection().removeAllRanges();
             }
         }
 
@@ -1322,7 +1696,22 @@ Respond strictly in JSON format matching this schema:
                 return;
             }
 
-            const dataStr = JSON.stringify(state.labels, null, 2);
+            // Normalize empty strings to null for nullable fields
+            const nullableFields = ['speaker_name', 'speaker_organization', 'speaker_role', 'event_context'];
+            const exportData = JSON.parse(JSON.stringify(state.labels));
+            Object.values(exportData).forEach(label => {
+                if (label.quote_blocks) {
+                    label.quote_blocks.forEach(block => {
+                        nullableFields.forEach(field => {
+                            if (block[field] !== undefined && block[field].trim() === '') {
+                                block[field] = null;
+                            }
+                        });
+                    });
+                }
+            });
+
+            const dataStr = JSON.stringify(exportData, null, 2);
             const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
             
             const exportFileDefaultName = 'labeled_articles.json';

@@ -18,8 +18,10 @@
             --success-color: #5b8e7d; 
             --danger-color: #c96f6f;  
             --danger-hover: #af5d5d;  
-            --warning-color: #d19a55; 
-            --header-bg: #f5f0e6;     
+            --warning-color: #d19a55;
+            --paraphrase-color: #9b7fd4;
+            --candidate-color: #6b9ec8;
+            --header-bg: #f5f0e6;
             --radius: 8px;
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
             --font-family: 'Inter', sans-serif;
@@ -277,6 +279,7 @@
 
         .ctx-option.speech-direct { border-left: 3px solid var(--success-color); }
         .ctx-option.speech-indirect { border-left: 3px solid var(--warning-color); }
+        .ctx-option.speech-paraphrase { border-left: 3px solid var(--paraphrase-color); }
 
         /* ----- Speaker Popup ----- */
         #speaker-popup {
@@ -568,24 +571,28 @@
         .badge-unlabeled { background-color: rgba(148, 163, 184, 0.2); color: var(--text-muted); }
 
         /* Highlights */
-        .highlight-existing {
-            background-color: rgba(91, 142, 125, 0.3); /* success-color with opacity */
+        .highlight-direct {
+            background-color: rgba(91, 142, 125, 0.25);
             border-bottom: 2px solid var(--success-color);
             color: var(--text-main);
         }
 
-        .highlight-potential {
-            background-color: rgba(209, 154, 85, 0.3); /* warning-color with opacity */
-            border-bottom: 2px dashed var(--warning-color);
+        .highlight-indirect {
+            background-color: rgba(209, 154, 85, 0.25);
+            border-bottom: 2px solid var(--warning-color);
             color: var(--text-main);
         }
 
-        .highlight-verb {
-            background-color: rgba(109, 140, 114, 0.3); /* accent-color with opacity */
-            font-weight: 600;
-            color: var(--accent-hover);
-            padding: 0 0.1rem;
-            border-radius: 2px;
+        .highlight-paraphrase {
+            background-color: rgba(155, 127, 212, 0.2);
+            border-bottom: 2px solid var(--paraphrase-color);
+            color: var(--text-main);
+        }
+
+        .highlight-potential, .highlight-verb {
+            background-color: rgba(107, 158, 200, 0.2);
+            border-bottom: 2px dashed var(--candidate-color);
+            color: var(--text-main);
         }
 
     </style>
@@ -646,6 +653,7 @@
                 <div id="ctx-speech-type" style="display: none;">
                     <div class="ctx-option speech-direct" data-type="direct_quote">Direct Quote</div>
                     <div class="ctx-option speech-indirect" data-type="indirect_speech">Indirect Speech</div>
+                    <div class="ctx-option speech-paraphrase" data-type="paraphrase">Paraphrase</div>
                 </div>
             </div>
         </article>
@@ -1055,9 +1063,11 @@
                 sortedBlocks.forEach(block => {
                     const blockText = escapeHtml(block.quote_text);
                     if (blockText) {
-                        // Use a split/join approach for exact string replace to avoid regex special char issues
+                        const hlClass = block.speech_type === 'indirect_speech' ? 'highlight-indirect'
+                                      : block.speech_type === 'paraphrase'      ? 'highlight-paraphrase'
+                                      :                                           'highlight-direct';
                         const parts = text.split(blockText);
-                        text = parts.join(`<span class="highlight-existing">${blockText}</span>`);
+                        text = parts.join(`<span class="${hlClass}">${blockText}</span>`);
                     }
                 });
             }
@@ -1071,14 +1081,14 @@
             // Use non-greedy match (.*?) and 's' flag to match across newlines if there are any inside quotes.
             const quotePattern = /&quot;(.*?)&quot;/gs;
             text = text.replace(quotePattern, (match, p1) => {
-                if (match.includes('<span class="highlight-existing"')) return match; // skip already labeled
+                if (match.includes('class="highlight-')) return match; // skip already labeled
                 return `&quot;<span class="highlight-potential">${p1}</span>&quot;`;
             });
-            
+
             // Pattern 2: Typical Turkish speech reporting verbs (dedi, söyledi, belirtti, ifade etti, vurguladı, vs)
             const verbPattern = /\b(dedi|söyledi|belirtti|ifade etti|vurguladı|kaydetti|açıkladı|bildirdi|savundu|ileri sürdü|değerlendirmesinde bulundu)\b/gi;
             text = text.replace(verbPattern, (match) => {
-                if (match.includes('<span class="highlight-existing"')) return match;
+                if (match.includes('class="highlight-')) return match;
                 return `<span class="highlight-verb">${match}</span>`;
             });
 
@@ -1142,16 +1152,16 @@
         const suggestFields = ['speaker_name', 'speaker_organization', 'speaker_role', 'event_context'];
 
         function updateSuggestions() {
+            const articleId = state.articles[state.currentIndex]?.article_id;
+            const currentLabel = articleId ? state.labels[articleId] : null;
             suggestFields.forEach(field => {
                 const values = new Set();
-                Object.values(state.labels).forEach(label => {
-                    if (label.quote_blocks) {
-                        label.quote_blocks.forEach(block => {
-                            const v = (block[field] || '').trim();
-                            if (v) values.add(v);
-                        });
-                    }
-                });
+                if (currentLabel && currentLabel.quote_blocks) {
+                    currentLabel.quote_blocks.forEach(block => {
+                        const v = (block[field] || '').trim();
+                        if (v) values.add(v);
+                    });
+                }
                 let dl = document.getElementById(`dl-${field}`);
                 if (!dl) {
                     dl = document.createElement('datalist');
@@ -1210,6 +1220,7 @@
                             <select class="form-control bind-input" data-idx="${index}" data-field="speech_type">
                                 <option value="direct_quote" ${block.speech_type === 'direct_quote' ? 'selected' : ''}>Direct Quote</option>
                                 <option value="indirect_speech" ${block.speech_type === 'indirect_speech' ? 'selected' : ''}>Indirect Speech</option>
+                                <option value="paraphrase" ${block.speech_type === 'paraphrase' ? 'selected' : ''}>Paraphrase</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -1599,7 +1610,7 @@ Given the following selected text from the article, determine:
 1. speaker_name: Who is speaking?
 2. speaker_organization: Their organization or political party (or "null" if not explicitly stated)
 3. speaker_role: Their official title/role (or "null" if not explicitly stated)
-4. speech_type: "direct_quote" or "indirect_speech"
+4. speech_type: "direct_quote", "indirect_speech", or "paraphrase" (paraphrase = a reported communicative act attributed to an actor using verbs like threatened, demanded, refused, announced — neither verbatim nor indirect speech)
 5. event_context: The occasion/platform where speech was delivered (or "null")
 6. include_reasoning: 1 sentence explaining the attribution.
 
@@ -1615,7 +1626,7 @@ Respond strictly in JSON format matching this schema:
   "speaker_name": "string",
   "speaker_organization": "string or null",
   "speaker_role": "string or null",
-  "speech_type": "direct_quote | indirect_speech",
+  "speech_type": "direct_quote | indirect_speech | paraphrase",
   "event_context": "string or null",
   "include_reasoning": "string"
 }`;
@@ -1656,7 +1667,7 @@ Respond strictly in JSON format matching this schema:
                     speaker_name: parsedResult.speaker_name === 'null' ? '' : (parsedResult.speaker_name || ''),
                     speaker_organization: (parsedResult.speaker_organization || parsedResult.speaker_party || '') === 'null' ? '' : (parsedResult.speaker_organization || parsedResult.speaker_party || ''),
                     speaker_role: parsedResult.speaker_role === 'null' ? '' : (parsedResult.speaker_role || ''),
-                    speech_type: ['direct_quote', 'indirect_speech'].includes(parsedResult.speech_type) ? parsedResult.speech_type : 'direct_quote',
+                    speech_type: ['direct_quote', 'indirect_speech', 'paraphrase'].includes(parsedResult.speech_type) ? parsedResult.speech_type : 'direct_quote',
                     event_context: parsedResult.event_context === 'null' ? '' : (parsedResult.event_context || ''),
                     quote_text: selectedText
                 };
